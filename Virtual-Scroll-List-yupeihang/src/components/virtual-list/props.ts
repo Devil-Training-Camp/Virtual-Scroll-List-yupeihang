@@ -22,7 +22,7 @@ const listProps = {
     },
     dynamic: {
         type: Boolean,
-        default: false
+        default: true
     },
     cache: {
         type: Number,
@@ -30,13 +30,7 @@ const listProps = {
     },
     data: {
         type: Array,
-        default: () => {
-            let arr = []
-            for( let j : number = 0; j < 10000; j++ ) {
-                arr.push(j)
-            }
-            return arr
-        }
+        default: () => []
     }
 };
 
