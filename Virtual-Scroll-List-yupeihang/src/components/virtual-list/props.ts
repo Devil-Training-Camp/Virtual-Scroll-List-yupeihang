@@ -22,7 +22,7 @@ const listProps = {
     },
     dynamic: {
         type: Boolean,
-        default: true
+        default: false
     },
     cache: {
         type: Number,

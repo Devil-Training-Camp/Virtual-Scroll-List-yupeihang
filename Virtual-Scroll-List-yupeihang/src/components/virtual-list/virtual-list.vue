@@ -1,6 +1,6 @@
 <template>
-  <div class="virtual-wrapper" ref="wrapperRef" style="height:500px"  @scroll="onScroll">
-        <div class="inner" ref="innerRef" style="height:500000px">
+  <div class="virtual-wrapper" ref="wrapperRef" :style="getWrapperStyle"  @scroll="onScroll">
+        <div class="inner" ref="innerRef" :style="getInnerStyle">
             <div class="list" ref="virtualListRef" :style="{ transform: `translateY(${state.scrollOffset}px)`}">
                 <div v-for="(item, index) in clientData" :key="index + state.start">
                     <slot name="item" :item="item"></slot>
@@ -20,26 +20,57 @@ const state = reactive<any>({
     scrollOffset: 0,
     cacheData: []
 });
+const isString = (val: unknown): val is string => typeof val === "string";
+const isNumber = (val: any): val is number => typeof val === "number";
+// 可视区域样式
+const getWrapperStyle = computed(() => {
+    const { style, height, width } = props;
+    const styleObj = isString(style) ? JSON.parse(style) : { ...style };
+    return {
+        height: `${height}px`,
+        width: isNumber(width) ? `${width}px` : width,
+        ...styleObj
+    };
+});
+const getInnerStyle = computed(() => {
+    return {
+        height: `${unref(getTotalHeight)}px`,
+        width: "100%"
+    };
+});
+// 数据数量
+const total = computed(() => {
+    return props.data.length;
+});
 
+// 总体高度
+const getTotalHeight = computed(() => {
+    if (!props.dynamic) return unref(total) * props.itemHeight;
+    return getCurrentTop(unref(total));
+});
 //当前可视的数据。
 const clientData = computed(() => {
     return props.data.slice(state.start, state.end);
+});
+// 当前屏幕显示的数量
+const clientCount = computed(() => {
+    return Math.ceil(props.height / props.itemHeight);
 });
 const onScroll = (e: any) => {
     const { scrollTop } = e.target;
     const { cache, dynamic, itemHeight } = props;
     if (state.scrollOffset === scrollTop) return;
-    const cacheCount = Math.max(1, cache) // 防止列表滚动过快，数据还没渲染，可能会导致空白的情况，效果不太好，关于这点，我们可以和无缝滚动一样，在当前可视区域前后各插入一屏，这样即可优化滚动效果。
+    const cacheCount = Math.max(1, cache) // 防止列表滚动过快，数据还没渲染，可能会导致空白的情况，效果不太好，在当前可视区域前后各插入一屏，优化滚动效果。
     let startIndex = dynamic ? getStartIndex(scrollTop) : Math.floor(scrollTop / itemHeight);
 
-    const endIndex = startIndex + 10 + cacheCount
+    const endIndex = Math.max(0, Math.min(unref(total), startIndex + unref(clientCount) + cacheCount));
     
     if (startIndex > cacheCount) {
         startIndex = startIndex - cacheCount;
     }
 
     // 偏移量
-    const offset = getCurrentTop(startIndex);
+    const offset = dynamic ? getCurrentTop(startIndex) : scrollTop - (scrollTop % itemHeight);
     Object.assign(state, {
         start: startIndex,
         end: endIndex,
@@ -77,9 +108,6 @@ const getCurrentTop = (index: number) => {
         return index * props.itemHeight;
     }
 };
-const getTotalHeight = computed(() => {
-    return getCurrentTop(props.data.length);
-});
 onUpdated(() => {
     const childrenList = virtualListRef.value.children || [];
     [...childrenList].forEach((node: any, index: number) => {
@@ -97,9 +125,9 @@ watchEffect(() => {
         const currentIndex = state.start + index;
         if (Object.hasOwn(state.cacheData, currentIndex)) return;
         state.cacheData[currentIndex] = {
-            top: currentIndex * 50,
-            height: 50,
-            bottom: (currentIndex + 1) * 50,
+            top: currentIndex * props.itemHeight,
+            height: props.itemHeight,
+            bottom: (currentIndex + 1) * props.itemHeight,
             index: currentIndex
         };
     });
